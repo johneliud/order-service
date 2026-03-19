@@ -42,3 +42,17 @@ public class CartController {
         CartResponse cart = cartService.addItem(userId, request);
         return ResponseEntity.ok(new ApiResponse<>(true, "Item added to cart", cart));
     }
+
+    @PutMapping("/items/{productId}")
+    public ResponseEntity<ApiResponse<CartResponse>> updateItem(
+            @PathVariable String productId,
+            @Valid @RequestBody UpdateCartItemRequest request,
+            @RequestHeader(value = "X-User-Id", required = false) String userId,
+            @RequestHeader(value = "X-User-Role", required = false) String role) {
+
+        log.info("PUT /api/cart/items/{} - userId: {}", productId, userId);
+        validateClientAccess(userId, role);
+
+        CartResponse cart = cartService.updateItem(userId, productId, request);
+        return ResponseEntity.ok(new ApiResponse<>(true, "Cart item updated", cart));
+    }
