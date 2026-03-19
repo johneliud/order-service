@@ -73,3 +73,18 @@ public class CartService {
         log.info("Updated item productId: {} quantity to {} for userId: {}", productId, request.getQuantity(), userId);
         return toCartResponse(saved);
     }
+
+    public CartResponse removeItem(String userId, String productId) {
+        log.info("Removing item productId: {} from cart for userId: {}", productId, userId);
+        Cart cart = getOrCreateCart(userId);
+
+        boolean removed = cart.getItems().removeIf(item -> item.getProductId().equals(productId));
+        if (!removed) {
+            log.warn("Item productId: {} not found in cart for userId: {}", productId, userId);
+            throw new IllegalArgumentException("Item not found in cart");
+        }
+
+        Cart saved = cartRepository.save(cart);
+        log.info("Removed item productId: {} from cart for userId: {}", productId, userId);
+        return toCartResponse(saved);
+    }
