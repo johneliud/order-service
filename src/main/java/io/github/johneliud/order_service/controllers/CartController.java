@@ -69,3 +69,15 @@ public class CartController {
         CartResponse cart = cartService.removeItem(userId, productId);
         return ResponseEntity.ok(new ApiResponse<>(true, "Item removed from cart", cart));
     }
+
+    @DeleteMapping
+    public ResponseEntity<ApiResponse<Void>> clearCart(
+            @RequestHeader(value = "X-User-Id", required = false) String userId,
+            @RequestHeader(value = "X-User-Role", required = false) String role) {
+
+        log.info("DELETE /api/cart - userId: {}", userId);
+        validateClientAccess(userId, role);
+
+        cartService.clearCart(userId);
+        return ResponseEntity.ok(new ApiResponse<>(true, "Cart cleared", null));
+    }
