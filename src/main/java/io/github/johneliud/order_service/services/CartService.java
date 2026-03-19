@@ -55,3 +55,21 @@ public class CartService {
         Cart saved = cartRepository.save(cart);
         return toCartResponse(saved);
     }
+
+    public CartResponse updateItem(String userId, String productId, UpdateCartItemRequest request) {
+        log.info("Updating item productId: {} in cart for userId: {}", productId, userId);
+        Cart cart = getOrCreateCart(userId);
+
+        CartItem item = cart.getItems().stream()
+                .filter(i -> i.getProductId().equals(productId))
+                .findFirst()
+                .orElseThrow(() -> {
+                    log.warn("Item productId: {} not found in cart for userId: {}", productId, userId);
+                    return new IllegalArgumentException("Item not found in cart");
+                });
+
+        item.setQuantity(request.getQuantity());
+        Cart saved = cartRepository.save(cart);
+        log.info("Updated item productId: {} quantity to {} for userId: {}", productId, request.getQuantity(), userId);
+        return toCartResponse(saved);
+    }
