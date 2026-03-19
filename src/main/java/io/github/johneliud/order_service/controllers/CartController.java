@@ -29,3 +29,16 @@ public class CartController {
         CartResponse cart = cartService.getCart(userId);
         return ResponseEntity.ok(new ApiResponse<>(true, "Cart retrieved successfully", cart));
     }
+
+    @PostMapping("/items")
+    public ResponseEntity<ApiResponse<CartResponse>> addItem(
+            @Valid @RequestBody CartItemRequest request,
+            @RequestHeader(value = "X-User-Id", required = false) String userId,
+            @RequestHeader(value = "X-User-Role", required = false) String role) {
+
+        log.info("POST /api/cart/items - userId: {}, productId: {}", userId, request.getProductId());
+        validateClientAccess(userId, role);
+
+        CartResponse cart = cartService.addItem(userId, request);
+        return ResponseEntity.ok(new ApiResponse<>(true, "Item added to cart", cart));
+    }
