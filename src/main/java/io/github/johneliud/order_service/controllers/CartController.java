@@ -56,3 +56,16 @@ public class CartController {
         CartResponse cart = cartService.updateItem(userId, productId, request);
         return ResponseEntity.ok(new ApiResponse<>(true, "Cart item updated", cart));
     }
+
+    @DeleteMapping("/items/{productId}")
+    public ResponseEntity<ApiResponse<CartResponse>> removeItem(
+            @PathVariable String productId,
+            @RequestHeader(value = "X-User-Id", required = false) String userId,
+            @RequestHeader(value = "X-User-Role", required = false) String role) {
+
+        log.info("DELETE /api/cart/items/{} - userId: {}", productId, userId);
+        validateClientAccess(userId, role);
+
+        CartResponse cart = cartService.removeItem(userId, productId);
+        return ResponseEntity.ok(new ApiResponse<>(true, "Item removed from cart", cart));
+    }
