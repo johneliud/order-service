@@ -81,3 +81,13 @@ public class CartController {
         cartService.clearCart(userId);
         return ResponseEntity.ok(new ApiResponse<>(true, "Cart cleared", null));
     }
+
+    private void validateClientAccess(String userId, String role) {
+        if (userId == null || role == null) {
+            throw new IllegalArgumentException("Authentication required");
+        }
+        if (!role.equals("CLIENT")) {
+            throw new IllegalArgumentException("Only clients can manage a cart");
+        }
+    }
+}
