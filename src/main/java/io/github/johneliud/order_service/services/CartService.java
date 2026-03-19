@@ -106,3 +106,32 @@ public class CartService {
             return cartRepository.save(newCart);
         });
     }
+
+    private CartResponse toCartResponse(Cart cart) {
+        List<CartItemResponse> itemResponses = cart.getItems().stream()
+                .map(item -> {
+                    BigDecimal subtotal = item.getPrice().multiply(BigDecimal.valueOf(item.getQuantity()));
+                    return new CartItemResponse(
+                            item.getProductId(),
+                            item.getProductName(),
+                            item.getPrice(),
+                            item.getQuantity(),
+                            item.getImageUrl(),
+                            subtotal
+                    );
+                })
+                .collect(Collectors.toList());
+
+        BigDecimal total = itemResponses.stream()
+                .map(CartItemResponse::getSubtotal)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        return new CartResponse(
+                cart.getId(),
+                cart.getUserId(),
+                itemResponses,
+                total,
+                cart.getUpdatedAt()
+        );
+    }
+}
