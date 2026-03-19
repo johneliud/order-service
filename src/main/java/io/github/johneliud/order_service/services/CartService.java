@@ -88,3 +88,21 @@ public class CartService {
         log.info("Removed item productId: {} from cart for userId: {}", productId, userId);
         return toCartResponse(saved);
     }
+
+    public void clearCart(String userId) {
+        log.info("Clearing cart for userId: {}", userId);
+        Cart cart = getOrCreateCart(userId);
+        cart.setItems(new ArrayList<>());
+        cartRepository.save(cart);
+        log.info("Cart cleared for userId: {}", userId);
+    }
+
+    private Cart getOrCreateCart(String userId) {
+        return cartRepository.findByUserId(userId).orElseGet(() -> {
+            log.info("No cart found for userId: {}, creating new cart", userId);
+            Cart newCart = new Cart();
+            newCart.setUserId(userId);
+            newCart.setItems(new ArrayList<>());
+            return cartRepository.save(newCart);
+        });
+    }
