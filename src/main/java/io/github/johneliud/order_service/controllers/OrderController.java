@@ -35,3 +35,23 @@ public class OrderController {
         PagedResponse<OrderResponse> orders = orderService.getOrdersByBuyer(userId, page, size, search, status);
         return ResponseEntity.ok(new ApiResponse<>(true, "Orders retrieved successfully", orders));
     }
+
+    @GetMapping("/{orderId}")
+    public ResponseEntity<ApiResponse<OrderResponse>> getOrderById(
+            @PathVariable String orderId,
+            @RequestHeader(value = "X-User-Id", required = false) String userId,
+            @RequestHeader(value = "X-User-Role", required = false) String role) {
+
+        log.info("GET /api/orders/{} - userId: {}", orderId, userId);
+        requireAuth(userId, role);
+
+        OrderResponse order = orderService.getOrderById(orderId, userId);
+        return ResponseEntity.ok(new ApiResponse<>(true, "Order retrieved successfully", order));
+    }
+
+    private void requireAuth(String userId, String role) {
+        if (userId == null || role == null) {
+            throw new IllegalArgumentException("Authentication required");
+        }
+    }
+}
