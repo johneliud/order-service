@@ -29,4 +29,7 @@ public class CartItemRequest {
     private Integer quantity;
 
     private String imageUrl;
+
+    @NotBlank(message = "Seller ID is required")
+    private String sellerId;
 }

@@ -1,9 +1,6 @@
 package io.github.johneliud.order_service.services;
 
-import io.github.johneliud.order_service.dto.CartItemRequest;
-import io.github.johneliud.order_service.dto.CartItemResponse;
-import io.github.johneliud.order_service.dto.CartResponse;
-import io.github.johneliud.order_service.dto.UpdateCartItemRequest;
+import io.github.johneliud.order_service.dto.*;
 import io.github.johneliud.order_service.models.Cart;
 import io.github.johneliud.order_service.models.CartItem;
 import io.github.johneliud.order_service.repositories.CartRepository;
@@ -12,9 +9,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -22,6 +17,7 @@ import java.util.stream.Collectors;
 @Slf4j
 public class CartService {
     private final CartRepository cartRepository;
+    private final OrderService orderService;
 
     public CartResponse getCart(String userId) {
         log.info("Fetching cart for userId: {}", userId);
@@ -46,7 +42,8 @@ public class CartService {
                     request.getProductName(),
                     request.getPrice(),
                     request.getQuantity(),
-                    request.getImageUrl()
+                    request.getImageUrl(),
+                    request.getSellerId()
             );
             cart.getItems().add(newItem);
             log.info("Added new item productId: {} to cart for userId: {}", request.getProductId(), userId);
@@ -95,6 +92,29 @@ public class CartService {
         cart.setItems(new ArrayList<>());
         cartRepository.save(cart);
         log.info("Cart cleared for userId: {}", userId);
+    }
+
+    public List<OrderResponse> checkout(String userId, CheckoutRequest request) {
+        log.info("Processing checkout for userId: {}", userId);
+        Cart cart = getOrCreateCart(userId);
+
+        if (cart.getItems().isEmpty()) {
+            log.warn("Checkout failed: cart is empty for userId: {}", userId);
+            throw new IllegalArgumentException("Cannot checkout with an empty cart");
+        }
+
+        Map<String, List<CartItem>> itemsBySeller = cart.getItems().stream()
+                .collect(Collectors.groupingBy(CartItem::getSellerId));
+
+        List<OrderResponse> orders = itemsBySeller.entrySet().stream()
+                .map(entry -> orderService.createOrder(userId, entry.getKey(), entry.getValue(), request))
+                .collect(Collectors.toList());
+
+        cart.setItems(new ArrayList<>());
+        cartRepository.save(cart);
+        log.info("Checkout complete for userId: {}, {} order(s) created, cart cleared", userId, orders.size());
+
+        return orders;
     }
 
     private Cart getOrCreateCart(String userId) {

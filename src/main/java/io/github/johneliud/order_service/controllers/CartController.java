@@ -1,15 +1,15 @@
 package io.github.johneliud.order_service.controllers;
 
-import io.github.johneliud.order_service.dto.ApiResponse;
-import io.github.johneliud.order_service.dto.CartItemRequest;
-import io.github.johneliud.order_service.dto.CartResponse;
-import io.github.johneliud.order_service.dto.UpdateCartItemRequest;
+import io.github.johneliud.order_service.dto.*;
 import io.github.johneliud.order_service.services.CartService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/cart")
@@ -80,6 +80,20 @@ public class CartController {
 
         cartService.clearCart(userId);
         return ResponseEntity.ok(new ApiResponse<>(true, "Cart cleared", null));
+    }
+
+    @PostMapping("/checkout")
+    public ResponseEntity<ApiResponse<List<OrderResponse>>> checkout(
+            @Valid @RequestBody CheckoutRequest request,
+            @RequestHeader(value = "X-User-Id", required = false) String userId,
+            @RequestHeader(value = "X-User-Role", required = false) String role) {
+
+        log.info("POST /api/cart/checkout - userId: {}", userId);
+        validateClientAccess(userId, role);
+
+        List<OrderResponse> orders = cartService.checkout(userId, request);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(new ApiResponse<>(true, "Order placed successfully", orders));
     }
 
     private void validateClientAccess(String userId, String role) {
