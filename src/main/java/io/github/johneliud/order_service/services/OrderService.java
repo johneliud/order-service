@@ -93,6 +93,33 @@ public class OrderService {
         log.info("Retrieved {} orders (page {}/{}) for buyer userId: {}", content.size(), page + 1, orderPage.getTotalPages(), userId);
         return new PagedResponse<>(content, orderPage.getNumber(), orderPage.getSize(), orderPage.getTotalElements(), orderPage.getTotalPages(), orderPage.isLast());
     }
+
+    public OrderResponse getOrderById(String orderId, String requestingUserId) {
+        log.info("Fetching order ID: {} for requestingUserId: {}", orderId, requestingUserId);
+
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> {
+                    log.warn("Order not found: {}", orderId);
+                    return new IllegalArgumentException("Order not found");
+                });
+
+        if (!order.getUserId().equals(requestingUserId) && !order.getSellerId().equals(requestingUserId)) {
+            log.warn("Access denied: userId {} attempted to view order {} owned by {} / seller {}", requestingUserId, orderId, order.getUserId(), order.getSellerId());
+            throw new IllegalArgumentException("Access denied: You do not have permission to view this order");
+        }
+
+        return toOrderResponse(order);
+    }
+
+    private OrderStatus parseStatus(String statusStr) {
+        if (statusStr == null || statusStr.isBlank()) return null;
+        try {
+            return OrderStatus.valueOf(statusStr.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("Invalid order status: " + statusStr);
+        }
+    }
+
     public OrderResponse toOrderResponse(Order order) {
         List<OrderItemResponse> itemResponses = order.getItems().stream()
                 .map(item -> {
