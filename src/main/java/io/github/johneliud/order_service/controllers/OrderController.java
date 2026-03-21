@@ -87,6 +87,23 @@ public class OrderController {
         OrderResponse order = orderService.cancelOrder(orderId, userId);
         return ResponseEntity.ok(new ApiResponse<>(true, "Order cancelled successfully", order));
     }
+
+    @DeleteMapping("/{orderId}")
+    public ResponseEntity<ApiResponse<Void>> removeOrder(
+            @PathVariable String orderId,
+            @RequestHeader(value = "X-User-Id", required = false) String userId,
+            @RequestHeader(value = "X-User-Role", required = false) String role) {
+
+        log.info("DELETE /api/orders/{} - userId: {}", orderId, userId);
+        requireAuth(userId, role);
+
+        if (!"CLIENT".equals(role)) {
+            throw new IllegalArgumentException("Only clients can access this endpoint");
+        }
+
+        orderService.removeOrder(orderId, userId);
+        return ResponseEntity.ok(new ApiResponse<>(true, "Order removed successfully", null));
+    }
     private void requireAuth(String userId, String role) {
         if (userId == null || role == null) {
             throw new IllegalArgumentException("Authentication required");
