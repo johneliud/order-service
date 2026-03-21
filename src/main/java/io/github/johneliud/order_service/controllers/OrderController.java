@@ -36,6 +36,26 @@ public class OrderController {
         return ResponseEntity.ok(new ApiResponse<>(true, "Orders retrieved successfully", orders));
     }
 
+    @GetMapping("/seller")
+    public ResponseEntity<ApiResponse<PagedResponse<OrderResponse>>> getSellerOrders(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String status,
+            @RequestHeader(value = "X-User-Id", required = false) String userId,
+            @RequestHeader(value = "X-User-Role", required = false) String role) {
+
+        log.info("GET /api/orders/seller - userId: {}, page: {}, size: {}, search: {}, status: {}", userId, page, size, search, status);
+        requireAuth(userId, role);
+
+        if (!"SELLER".equals(role)) {
+            throw new IllegalArgumentException("Only sellers can access this endpoint");
+        }
+
+        PagedResponse<OrderResponse> orders = orderService.getOrdersBySeller(userId, page, size, search, status);
+        return ResponseEntity.ok(new ApiResponse<>(true, "Orders retrieved successfully", orders));
+    }
+
     @GetMapping("/{orderId}")
     public ResponseEntity<ApiResponse<OrderResponse>> getOrderById(
             @PathVariable String orderId,
