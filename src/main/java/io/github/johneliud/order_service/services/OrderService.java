@@ -11,6 +11,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
+import io.github.johneliud.order_service.exception.ForbiddenException;
+
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
@@ -106,7 +108,7 @@ public class OrderService {
 
         if (!order.getUserId().equals(requestingUserId) && !order.getSellerId().equals(requestingUserId)) {
             log.warn("Access denied: userId {} attempted to view order {} owned by {} / seller {}", requestingUserId, orderId, order.getUserId(), order.getSellerId());
-            throw new IllegalArgumentException("Access denied: You do not have permission to view this order");
+            throw new ForbiddenException("Access denied: You do not have permission to view this order");
         }
 
         return toOrderResponse(order);
@@ -150,7 +152,7 @@ public class OrderService {
 
         if (!order.getUserId().equals(userId)) {
             log.warn("Access denied: userId {} attempted to cancel order {} owned by {}", userId, orderId, order.getUserId());
-            throw new IllegalArgumentException("Access denied");
+            throw new ForbiddenException("Access denied");
         }
 
         if (order.getStatus() != OrderStatus.PENDING) {
@@ -175,7 +177,7 @@ public class OrderService {
 
         if (!order.getUserId().equals(userId)) {
             log.warn("Access denied: userId {} attempted to remove order {} owned by {}", userId, orderId, order.getUserId());
-            throw new IllegalArgumentException("Access denied");
+            throw new ForbiddenException("Access denied");
         }
 
         if (order.getStatus() != OrderStatus.CANCELLED && order.getStatus() != OrderStatus.DELIVERED) {
@@ -198,7 +200,7 @@ public class OrderService {
 
         if (!order.getSellerId().equals(sellerId)) {
             log.warn("Access denied: sellerId {} attempted to update order {} belonging to seller {}", sellerId, orderId, order.getSellerId());
-            throw new IllegalArgumentException("Access denied");
+            throw new ForbiddenException("Access denied");
         }
 
         OrderStatus targetStatus = parseStatus(statusStr);
