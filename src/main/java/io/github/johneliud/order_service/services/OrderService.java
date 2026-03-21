@@ -163,6 +163,29 @@ public class OrderService {
         log.info("Order {} cancelled successfully by userId: {}", orderId, userId);
         return toOrderResponse(saved);
     }
+
+    public void removeOrder(String orderId, String userId) {
+        log.info("Removing order ID: {} for userId: {}", orderId, userId);
+
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> {
+                    log.warn("Order not found: {}", orderId);
+                    return new IllegalArgumentException("Order not found");
+                });
+
+        if (!order.getUserId().equals(userId)) {
+            log.warn("Access denied: userId {} attempted to remove order {} owned by {}", userId, orderId, order.getUserId());
+            throw new IllegalArgumentException("Access denied");
+        }
+
+        if (order.getStatus() != OrderStatus.CANCELLED && order.getStatus() != OrderStatus.DELIVERED) {
+            log.warn("Cannot remove order {}: current status is {}", orderId, order.getStatus());
+            throw new IllegalArgumentException("Only CANCELLED or DELIVERED orders can be removed");
+        }
+
+        orderRepository.delete(order);
+        log.info("Order {} removed successfully by userId: {}", orderId, userId);
+    }
     private OrderStatus parseStatus(String statusStr) {
         if (statusStr == null || statusStr.isBlank()) return null;
         try {
