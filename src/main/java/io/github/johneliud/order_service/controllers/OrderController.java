@@ -3,7 +3,9 @@ package io.github.johneliud.order_service.controllers;
 import io.github.johneliud.order_service.dto.ApiResponse;
 import io.github.johneliud.order_service.dto.OrderResponse;
 import io.github.johneliud.order_service.dto.PagedResponse;
+import io.github.johneliud.order_service.dto.UpdateOrderStatusRequest;
 import io.github.johneliud.order_service.services.OrderService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -69,6 +71,22 @@ public class OrderController {
         return ResponseEntity.ok(new ApiResponse<>(true, "Order retrieved successfully", order));
     }
 
+    @PutMapping("/{orderId}/cancel")
+    public ResponseEntity<ApiResponse<OrderResponse>> cancelOrder(
+            @PathVariable String orderId,
+            @RequestHeader(value = "X-User-Id", required = false) String userId,
+            @RequestHeader(value = "X-User-Role", required = false) String role) {
+
+        log.info("PUT /api/orders/{}/cancel - userId: {}", orderId, userId);
+        requireAuth(userId, role);
+
+        if (!"CLIENT".equals(role)) {
+            throw new IllegalArgumentException("Only clients can access this endpoint");
+        }
+
+        OrderResponse order = orderService.cancelOrder(orderId, userId);
+        return ResponseEntity.ok(new ApiResponse<>(true, "Order cancelled successfully", order));
+    }
     private void requireAuth(String userId, String role) {
         if (userId == null || role == null) {
             throw new IllegalArgumentException("Authentication required");
