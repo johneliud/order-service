@@ -186,6 +186,41 @@ public class OrderService {
         orderRepository.delete(order);
         log.info("Order {} removed successfully by userId: {}", orderId, userId);
     }
+
+    public OrderResponse updateOrderStatus(String orderId, String sellerId, String statusStr) {
+        log.info("Updating status for order ID: {} by sellerId: {} to {}", orderId, sellerId, statusStr);
+
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> {
+                    log.warn("Order not found: {}", orderId);
+                    return new IllegalArgumentException("Order not found");
+                });
+
+        if (!order.getSellerId().equals(sellerId)) {
+            log.warn("Access denied: sellerId {} attempted to update order {} belonging to seller {}", sellerId, orderId, order.getSellerId());
+            throw new IllegalArgumentException("Access denied");
+        }
+
+        OrderStatus targetStatus = parseStatus(statusStr);
+
+        Map<OrderStatus, OrderStatus> validTransitions = Map.of(
+                OrderStatus.PENDING, OrderStatus.CONFIRMED,
+                OrderStatus.CONFIRMED, OrderStatus.SHIPPED,
+                OrderStatus.SHIPPED, OrderStatus.DELIVERED
+        );
+
+        OrderStatus expectedNext = validTransitions.get(order.getStatus());
+        if (expectedNext == null || !expectedNext.equals(targetStatus)) {
+            log.warn("Invalid status transition for order {}: {} → {}", orderId, order.getStatus(), targetStatus);
+            throw new IllegalArgumentException("Invalid status transition: " + order.getStatus() + " → " + targetStatus);
+        }
+
+        order.setStatus(targetStatus);
+        Order saved = orderRepository.save(order);
+        log.info("Order {} status updated to {} by sellerId: {}", orderId, targetStatus, sellerId);
+        return toOrderResponse(saved);
+    }
+
     private OrderStatus parseStatus(String statusStr) {
         if (statusStr == null || statusStr.isBlank()) return null;
         try {
