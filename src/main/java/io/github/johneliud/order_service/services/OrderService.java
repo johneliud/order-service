@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -109,6 +110,115 @@ public class OrderService {
         }
 
         return toOrderResponse(order);
+    }
+
+    public PagedResponse<OrderResponse> getOrdersBySeller(String sellerId, int page, int size, String search, String statusStr) {
+        log.info("Fetching orders for seller sellerId: {}, page: {}, size: {}, search: {}, status: {}", sellerId, page, size, search, statusStr);
+
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        OrderStatus status = parseStatus(statusStr);
+
+        Page<Order> orderPage;
+        boolean hasSearch = search != null && !search.isBlank();
+
+        if (hasSearch && status != null) {
+            orderPage = orderRepository.findBySellerIdAndStatusAndItemsProductNameContainingIgnoreCase(sellerId, status, search, pageable);
+        } else if (hasSearch) {
+            orderPage = orderRepository.findBySellerIdAndItemsProductNameContainingIgnoreCase(sellerId, search, pageable);
+        } else if (status != null) {
+            orderPage = orderRepository.findBySellerIdAndStatus(sellerId, status, pageable);
+        } else {
+            orderPage = orderRepository.findBySellerId(sellerId, pageable);
+        }
+
+        List<OrderResponse> content = orderPage.getContent().stream()
+                .map(this::toOrderResponse)
+                .collect(Collectors.toList());
+
+        log.info("Retrieved {} orders (page {}/{}) for sellerId: {}", content.size(), page + 1, orderPage.getTotalPages(), sellerId);
+        return new PagedResponse<>(content, orderPage.getNumber(), orderPage.getSize(), orderPage.getTotalElements(), orderPage.getTotalPages(), orderPage.isLast());
+    }
+
+    public OrderResponse cancelOrder(String orderId, String userId) {
+        log.info("Cancelling order ID: {} for userId: {}", orderId, userId);
+
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> {
+                    log.warn("Order not found: {}", orderId);
+                    return new IllegalArgumentException("Order not found");
+                });
+
+        if (!order.getUserId().equals(userId)) {
+            log.warn("Access denied: userId {} attempted to cancel order {} owned by {}", userId, orderId, order.getUserId());
+            throw new IllegalArgumentException("Access denied");
+        }
+
+        if (order.getStatus() != OrderStatus.PENDING) {
+            log.warn("Cannot cancel order {}: current status is {}", orderId, order.getStatus());
+            throw new IllegalArgumentException("Only PENDING orders can be cancelled");
+        }
+
+        order.setStatus(OrderStatus.CANCELLED);
+        Order saved = orderRepository.save(order);
+        log.info("Order {} cancelled successfully by userId: {}", orderId, userId);
+        return toOrderResponse(saved);
+    }
+
+    public void removeOrder(String orderId, String userId) {
+        log.info("Removing order ID: {} for userId: {}", orderId, userId);
+
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> {
+                    log.warn("Order not found: {}", orderId);
+                    return new IllegalArgumentException("Order not found");
+                });
+
+        if (!order.getUserId().equals(userId)) {
+            log.warn("Access denied: userId {} attempted to remove order {} owned by {}", userId, orderId, order.getUserId());
+            throw new IllegalArgumentException("Access denied");
+        }
+
+        if (order.getStatus() != OrderStatus.CANCELLED && order.getStatus() != OrderStatus.DELIVERED) {
+            log.warn("Cannot remove order {}: current status is {}", orderId, order.getStatus());
+            throw new IllegalArgumentException("Only CANCELLED or DELIVERED orders can be removed");
+        }
+
+        orderRepository.delete(order);
+        log.info("Order {} removed successfully by userId: {}", orderId, userId);
+    }
+
+    public OrderResponse updateOrderStatus(String orderId, String sellerId, String statusStr) {
+        log.info("Updating status for order ID: {} by sellerId: {} to {}", orderId, sellerId, statusStr);
+
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> {
+                    log.warn("Order not found: {}", orderId);
+                    return new IllegalArgumentException("Order not found");
+                });
+
+        if (!order.getSellerId().equals(sellerId)) {
+            log.warn("Access denied: sellerId {} attempted to update order {} belonging to seller {}", sellerId, orderId, order.getSellerId());
+            throw new IllegalArgumentException("Access denied");
+        }
+
+        OrderStatus targetStatus = parseStatus(statusStr);
+
+        Map<OrderStatus, OrderStatus> validTransitions = Map.of(
+                OrderStatus.PENDING, OrderStatus.CONFIRMED,
+                OrderStatus.CONFIRMED, OrderStatus.SHIPPED,
+                OrderStatus.SHIPPED, OrderStatus.DELIVERED
+        );
+
+        OrderStatus expectedNext = validTransitions.get(order.getStatus());
+        if (expectedNext == null || !expectedNext.equals(targetStatus)) {
+            log.warn("Invalid status transition for order {}: {} → {}", orderId, order.getStatus(), targetStatus);
+            throw new IllegalArgumentException("Invalid status transition: " + order.getStatus() + " → " + targetStatus);
+        }
+
+        order.setStatus(targetStatus);
+        Order saved = orderRepository.save(order);
+        log.info("Order {} status updated to {} by sellerId: {}", orderId, targetStatus, sellerId);
+        return toOrderResponse(saved);
     }
 
     private OrderStatus parseStatus(String statusStr) {
