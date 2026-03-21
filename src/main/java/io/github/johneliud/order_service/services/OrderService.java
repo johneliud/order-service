@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -138,6 +139,30 @@ public class OrderService {
         return new PagedResponse<>(content, orderPage.getNumber(), orderPage.getSize(), orderPage.getTotalElements(), orderPage.getTotalPages(), orderPage.isLast());
     }
 
+    public OrderResponse cancelOrder(String orderId, String userId) {
+        log.info("Cancelling order ID: {} for userId: {}", orderId, userId);
+
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> {
+                    log.warn("Order not found: {}", orderId);
+                    return new IllegalArgumentException("Order not found");
+                });
+
+        if (!order.getUserId().equals(userId)) {
+            log.warn("Access denied: userId {} attempted to cancel order {} owned by {}", userId, orderId, order.getUserId());
+            throw new IllegalArgumentException("Access denied");
+        }
+
+        if (order.getStatus() != OrderStatus.PENDING) {
+            log.warn("Cannot cancel order {}: current status is {}", orderId, order.getStatus());
+            throw new IllegalArgumentException("Only PENDING orders can be cancelled");
+        }
+
+        order.setStatus(OrderStatus.CANCELLED);
+        Order saved = orderRepository.save(order);
+        log.info("Order {} cancelled successfully by userId: {}", orderId, userId);
+        return toOrderResponse(saved);
+    }
     private OrderStatus parseStatus(String statusStr) {
         if (statusStr == null || statusStr.isBlank()) return null;
         try {
