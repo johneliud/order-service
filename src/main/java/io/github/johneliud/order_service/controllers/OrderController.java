@@ -104,6 +104,25 @@ public class OrderController {
         orderService.removeOrder(orderId, userId);
         return ResponseEntity.ok(new ApiResponse<>(true, "Order removed successfully", null));
     }
+
+    @PutMapping("/{orderId}/status")
+    public ResponseEntity<ApiResponse<OrderResponse>> updateOrderStatus(
+            @PathVariable String orderId,
+            @RequestBody @Valid UpdateOrderStatusRequest request,
+            @RequestHeader(value = "X-User-Id", required = false) String userId,
+            @RequestHeader(value = "X-User-Role", required = false) String role) {
+
+        log.info("PUT /api/orders/{}/status - userId: {}, status: {}", orderId, userId, request.getStatus());
+        requireAuth(userId, role);
+
+        if (!"SELLER".equals(role)) {
+            throw new IllegalArgumentException("Only sellers can access this endpoint");
+        }
+
+        OrderResponse order = orderService.updateOrderStatus(orderId, userId, request.getStatus());
+        return ResponseEntity.ok(new ApiResponse<>(true, "Order status updated successfully", order));
+    }
+
     private void requireAuth(String userId, String role) {
         if (userId == null || role == null) {
             throw new IllegalArgumentException("Authentication required");
