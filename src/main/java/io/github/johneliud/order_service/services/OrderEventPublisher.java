@@ -30,3 +30,20 @@ public class OrderEventPublisher {
                     }
                 });
     }
+
+    public void publishOrderStatusChanged(OrderStatusChangedEvent event) {
+        kafkaTemplate.send(ORDER_STATUS_CHANGED_TOPIC, event.getOrderId(), event)
+                .whenComplete((result, ex) -> {
+                    if (ex != null) {
+                        log.error("Failed to publish order-status-changed event for orderId {}: {}", event.getOrderId(), ex.getMessage());
+                    } else {
+                        log.info("Published order-status-changed event for orderId {} ({} → {}) to partition {} offset {}",
+                                event.getOrderId(),
+                                event.getOldStatus(),
+                                event.getNewStatus(),
+                                result.getRecordMetadata().partition(),
+                                result.getRecordMetadata().offset());
+                    }
+                });
+    }
+}
