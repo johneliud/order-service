@@ -11,6 +11,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
+import io.github.johneliud.order_service.dto.OrderPlacedEvent;
+import io.github.johneliud.order_service.dto.OrderStatusChangedEvent;
 import io.github.johneliud.order_service.exception.ForbiddenException;
 
 import java.math.BigDecimal;
@@ -23,6 +25,7 @@ import java.util.stream.Collectors;
 @Slf4j
 public class OrderService {
     private final OrderRepository orderRepository;
+    private final OrderEventPublisher orderEventPublisher;
 
     public OrderResponse createOrder(String userId, String sellerId, List<CartItem> cartItems, CheckoutRequest request) {
         log.info("Creating order for userId: {}, sellerId: {}, items: {}", userId, sellerId, cartItems.size());
@@ -67,7 +70,13 @@ public class OrderService {
         Order saved = orderRepository.save(order);
         log.info("Order created successfully with ID: {} for userId: {}, sellerId: {}", saved.getId(), userId, sellerId);
 
-        return toOrderResponse(saved);
+        OrderResponse orderResponse = toOrderResponse(saved);
+        orderEventPublisher.publishOrderPlaced(new OrderPlacedEvent(
+                saved.getId(), saved.getUserId(), saved.getSellerId(),
+                orderResponse.getItems(), saved.getTotalAmount()
+        ));
+
+        return orderResponse;
     }
 
     public PagedResponse<OrderResponse> getOrdersByBuyer(String userId, int page, int size, String search, String statusStr) {
@@ -211,15 +220,22 @@ public class OrderService {
                 OrderStatus.SHIPPED, OrderStatus.DELIVERED
         );
 
-        OrderStatus expectedNext = validTransitions.get(order.getStatus());
+        OrderStatus oldStatus = order.getStatus();
+        OrderStatus expectedNext = validTransitions.get(oldStatus);
         if (expectedNext == null || !expectedNext.equals(targetStatus)) {
-            log.warn("Invalid status transition for order {}: {} → {}", orderId, order.getStatus(), targetStatus);
-            throw new IllegalArgumentException("Invalid status transition: " + order.getStatus() + " → " + targetStatus);
+            log.warn("Invalid status transition for order {}: {} → {}", orderId, oldStatus, targetStatus);
+            throw new IllegalArgumentException("Invalid status transition: " + oldStatus + " → " + targetStatus);
         }
 
         order.setStatus(targetStatus);
         Order saved = orderRepository.save(order);
         log.info("Order {} status updated to {} by sellerId: {}", orderId, targetStatus, sellerId);
+
+        orderEventPublisher.publishOrderStatusChanged(new OrderStatusChangedEvent(
+                saved.getId(), saved.getUserId(), saved.getSellerId(),
+                oldStatus.name(), targetStatus.name()
+        ));
+
         return toOrderResponse(saved);
     }
 
