@@ -11,6 +11,10 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
+import io.github.johneliud.order_service.dto.OrderPlacedEvent;
+import io.github.johneliud.order_service.dto.OrderStatusChangedEvent;
+import io.github.johneliud.order_service.exception.ForbiddenException;
+
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
@@ -21,6 +25,7 @@ import java.util.stream.Collectors;
 @Slf4j
 public class OrderService {
     private final OrderRepository orderRepository;
+    private final OrderEventPublisher orderEventPublisher;
 
     public OrderResponse createOrder(String userId, String sellerId, List<CartItem> cartItems, CheckoutRequest request) {
         log.info("Creating order for userId: {}, sellerId: {}, items: {}", userId, sellerId, cartItems.size());
@@ -65,7 +70,13 @@ public class OrderService {
         Order saved = orderRepository.save(order);
         log.info("Order created successfully with ID: {} for userId: {}, sellerId: {}", saved.getId(), userId, sellerId);
 
-        return toOrderResponse(saved);
+        OrderResponse orderResponse = toOrderResponse(saved);
+        orderEventPublisher.publishOrderPlaced(new OrderPlacedEvent(
+                saved.getId(), saved.getUserId(), saved.getSellerId(),
+                orderResponse.getItems(), saved.getTotalAmount()
+        ));
+
+        return orderResponse;
     }
 
     public PagedResponse<OrderResponse> getOrdersByBuyer(String userId, int page, int size, String search, String statusStr) {
@@ -106,7 +117,7 @@ public class OrderService {
 
         if (!order.getUserId().equals(requestingUserId) && !order.getSellerId().equals(requestingUserId)) {
             log.warn("Access denied: userId {} attempted to view order {} owned by {} / seller {}", requestingUserId, orderId, order.getUserId(), order.getSellerId());
-            throw new IllegalArgumentException("Access denied: You do not have permission to view this order");
+            throw new ForbiddenException("Access denied: You do not have permission to view this order");
         }
 
         return toOrderResponse(order);
@@ -150,7 +161,7 @@ public class OrderService {
 
         if (!order.getUserId().equals(userId)) {
             log.warn("Access denied: userId {} attempted to cancel order {} owned by {}", userId, orderId, order.getUserId());
-            throw new IllegalArgumentException("Access denied");
+            throw new ForbiddenException("Access denied");
         }
 
         if (order.getStatus() != OrderStatus.PENDING) {
@@ -175,7 +186,7 @@ public class OrderService {
 
         if (!order.getUserId().equals(userId)) {
             log.warn("Access denied: userId {} attempted to remove order {} owned by {}", userId, orderId, order.getUserId());
-            throw new IllegalArgumentException("Access denied");
+            throw new ForbiddenException("Access denied");
         }
 
         if (order.getStatus() != OrderStatus.CANCELLED && order.getStatus() != OrderStatus.DELIVERED) {
@@ -198,7 +209,7 @@ public class OrderService {
 
         if (!order.getSellerId().equals(sellerId)) {
             log.warn("Access denied: sellerId {} attempted to update order {} belonging to seller {}", sellerId, orderId, order.getSellerId());
-            throw new IllegalArgumentException("Access denied");
+            throw new ForbiddenException("Access denied");
         }
 
         OrderStatus targetStatus = parseStatus(statusStr);
@@ -209,15 +220,22 @@ public class OrderService {
                 OrderStatus.SHIPPED, OrderStatus.DELIVERED
         );
 
-        OrderStatus expectedNext = validTransitions.get(order.getStatus());
+        OrderStatus oldStatus = order.getStatus();
+        OrderStatus expectedNext = validTransitions.get(oldStatus);
         if (expectedNext == null || !expectedNext.equals(targetStatus)) {
-            log.warn("Invalid status transition for order {}: {} → {}", orderId, order.getStatus(), targetStatus);
-            throw new IllegalArgumentException("Invalid status transition: " + order.getStatus() + " → " + targetStatus);
+            log.warn("Invalid status transition for order {}: {} → {}", orderId, oldStatus, targetStatus);
+            throw new IllegalArgumentException("Invalid status transition: " + oldStatus + " → " + targetStatus);
         }
 
         order.setStatus(targetStatus);
         Order saved = orderRepository.save(order);
         log.info("Order {} status updated to {} by sellerId: {}", orderId, targetStatus, sellerId);
+
+        orderEventPublisher.publishOrderStatusChanged(new OrderStatusChangedEvent(
+                saved.getId(), saved.getUserId(), saved.getSellerId(),
+                oldStatus.name(), targetStatus.name()
+        ));
+
         return toOrderResponse(saved);
     }
 

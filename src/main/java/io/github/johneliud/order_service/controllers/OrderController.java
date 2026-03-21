@@ -4,6 +4,8 @@ import io.github.johneliud.order_service.dto.ApiResponse;
 import io.github.johneliud.order_service.dto.OrderResponse;
 import io.github.johneliud.order_service.dto.PagedResponse;
 import io.github.johneliud.order_service.dto.UpdateOrderStatusRequest;
+import io.github.johneliud.order_service.exception.ForbiddenException;
+import io.github.johneliud.order_service.exception.UnauthorizedException;
 import io.github.johneliud.order_service.services.OrderService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -31,7 +33,7 @@ public class OrderController {
         requireAuth(userId, role);
 
         if (!"CLIENT".equals(role)) {
-            throw new IllegalArgumentException("Only clients can access this endpoint");
+            throw new ForbiddenException("Only clients can access this endpoint");
         }
 
         PagedResponse<OrderResponse> orders = orderService.getOrdersByBuyer(userId, page, size, search, status);
@@ -51,7 +53,7 @@ public class OrderController {
         requireAuth(userId, role);
 
         if (!"SELLER".equals(role)) {
-            throw new IllegalArgumentException("Only sellers can access this endpoint");
+            throw new ForbiddenException("Only sellers can access this endpoint");
         }
 
         PagedResponse<OrderResponse> orders = orderService.getOrdersBySeller(userId, page, size, search, status);
@@ -81,7 +83,7 @@ public class OrderController {
         requireAuth(userId, role);
 
         if (!"CLIENT".equals(role)) {
-            throw new IllegalArgumentException("Only clients can access this endpoint");
+            throw new ForbiddenException("Only clients can access this endpoint");
         }
 
         OrderResponse order = orderService.cancelOrder(orderId, userId);
@@ -98,7 +100,7 @@ public class OrderController {
         requireAuth(userId, role);
 
         if (!"CLIENT".equals(role)) {
-            throw new IllegalArgumentException("Only clients can access this endpoint");
+            throw new ForbiddenException("Only clients can access this endpoint");
         }
 
         orderService.removeOrder(orderId, userId);
@@ -116,7 +118,7 @@ public class OrderController {
         requireAuth(userId, role);
 
         if (!"SELLER".equals(role)) {
-            throw new IllegalArgumentException("Only sellers can access this endpoint");
+            throw new ForbiddenException("Only sellers can access this endpoint");
         }
 
         OrderResponse order = orderService.updateOrderStatus(orderId, userId, request.getStatus());
@@ -125,7 +127,7 @@ public class OrderController {
 
     private void requireAuth(String userId, String role) {
         if (userId == null || role == null) {
-            throw new IllegalArgumentException("Authentication required");
+            throw new UnauthorizedException("Authentication required");
         }
     }
 }

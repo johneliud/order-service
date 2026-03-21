@@ -1,6 +1,8 @@
 package io.github.johneliud.order_service.controllers;
 
 import io.github.johneliud.order_service.dto.*;
+import io.github.johneliud.order_service.exception.ForbiddenException;
+import io.github.johneliud.order_service.exception.UnauthorizedException;
 import io.github.johneliud.order_service.services.CartService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -98,10 +100,10 @@ public class CartController {
 
     private void validateClientAccess(String userId, String role) {
         if (userId == null || role == null) {
-            throw new IllegalArgumentException("Authentication required");
+            throw new UnauthorizedException("Authentication required");
         }
         if (!role.equals("CLIENT")) {
-            throw new IllegalArgumentException("Only clients can manage a cart");
+            throw new ForbiddenException("Only clients can manage a cart");
         }
     }
 }
