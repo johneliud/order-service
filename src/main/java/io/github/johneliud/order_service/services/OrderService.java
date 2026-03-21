@@ -111,6 +111,33 @@ public class OrderService {
         return toOrderResponse(order);
     }
 
+    public PagedResponse<OrderResponse> getOrdersBySeller(String sellerId, int page, int size, String search, String statusStr) {
+        log.info("Fetching orders for seller sellerId: {}, page: {}, size: {}, search: {}, status: {}", sellerId, page, size, search, statusStr);
+
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        OrderStatus status = parseStatus(statusStr);
+
+        Page<Order> orderPage;
+        boolean hasSearch = search != null && !search.isBlank();
+
+        if (hasSearch && status != null) {
+            orderPage = orderRepository.findBySellerIdAndStatusAndItemsProductNameContainingIgnoreCase(sellerId, status, search, pageable);
+        } else if (hasSearch) {
+            orderPage = orderRepository.findBySellerIdAndItemsProductNameContainingIgnoreCase(sellerId, search, pageable);
+        } else if (status != null) {
+            orderPage = orderRepository.findBySellerIdAndStatus(sellerId, status, pageable);
+        } else {
+            orderPage = orderRepository.findBySellerId(sellerId, pageable);
+        }
+
+        List<OrderResponse> content = orderPage.getContent().stream()
+                .map(this::toOrderResponse)
+                .collect(Collectors.toList());
+
+        log.info("Retrieved {} orders (page {}/{}) for sellerId: {}", content.size(), page + 1, orderPage.getTotalPages(), sellerId);
+        return new PagedResponse<>(content, orderPage.getNumber(), orderPage.getSize(), orderPage.getTotalElements(), orderPage.getTotalPages(), orderPage.isLast());
+    }
+
     private OrderStatus parseStatus(String statusStr) {
         if (statusStr == null || statusStr.isBlank()) return null;
         try {
