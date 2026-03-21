@@ -30,6 +30,5 @@ public class CartItemRequest {
 
     private String imageUrl;
 
-    @NotBlank(message = "Seller ID is required")
     private String sellerId;
 }
