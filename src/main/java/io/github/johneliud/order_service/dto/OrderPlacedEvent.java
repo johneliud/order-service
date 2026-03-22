@@ -14,6 +14,6 @@ public class OrderPlacedEvent {
     private String orderId;
     private String userId;
     private String sellerId;
-    private List<OrderItemResponse> items;
+    private List<OrderItemEvent> items;
     private BigDecimal totalAmount;
 }
