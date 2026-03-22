@@ -71,10 +71,17 @@ public class OrderService {
         log.info("Order created successfully with ID: {} for userId: {}, sellerId: {}", saved.getId(), userId, sellerId);
 
         OrderResponse orderResponse = toOrderResponse(saved);
-        orderEventPublisher.publishOrderPlaced(new OrderPlacedEvent(
-                saved.getId(), saved.getUserId(), saved.getSellerId(),
-                orderResponse.getItems(), saved.getTotalAmount()
-        ));
+        try {
+            List<OrderItemEvent> eventItems = orderResponse.getItems().stream()
+                    .map(i -> new OrderItemEvent(i.getProductId(), i.getProductName(), i.getPrice(), i.getQuantity()))
+                    .collect(Collectors.toList());
+            orderEventPublisher.publishOrderPlaced(new OrderPlacedEvent(
+                    saved.getId(), saved.getUserId(), saved.getSellerId(),
+                    eventItems, saved.getTotalAmount()
+            ));
+        } catch (Exception e) {
+            log.error("Failed to publish order-placed event for orderId {}: {}", saved.getId(), e.getMessage());
+        }
 
         return orderResponse;
     }
@@ -231,10 +238,14 @@ public class OrderService {
         Order saved = orderRepository.save(order);
         log.info("Order {} status updated to {} by sellerId: {}", orderId, targetStatus, sellerId);
 
-        orderEventPublisher.publishOrderStatusChanged(new OrderStatusChangedEvent(
-                saved.getId(), saved.getUserId(), saved.getSellerId(),
-                oldStatus.name(), targetStatus.name()
-        ));
+        try {
+            orderEventPublisher.publishOrderStatusChanged(new OrderStatusChangedEvent(
+                    saved.getId(), saved.getUserId(), saved.getSellerId(),
+                    oldStatus.name(), targetStatus.name()
+            ));
+        } catch (Exception e) {
+            log.error("Failed to publish order-status-changed event for orderId {}: {}", saved.getId(), e.getMessage());
+        }
 
         return toOrderResponse(saved);
     }
