@@ -1,5 +1,6 @@
 package io.github.johneliud.order_service.services;
 
+import io.github.johneliud.order_service.client.ProductServiceClient;
 import io.github.johneliud.order_service.dto.*;
 import io.github.johneliud.order_service.models.Cart;
 import io.github.johneliud.order_service.models.CartItem;
@@ -18,6 +19,7 @@ import java.util.stream.Collectors;
 public class CartService {
     private final CartRepository cartRepository;
     private final OrderService orderService;
+    private final ProductServiceClient productServiceClient;
 
     public CartResponse getCart(String userId) {
         log.info("Fetching cart for userId: {}", userId);
@@ -29,21 +31,27 @@ public class CartService {
         log.info("Adding item productId: {} to cart for userId: {}", request.getProductId(), userId);
         Cart cart = getOrCreateCart(userId);
 
+        ProductDto product = productServiceClient.getProduct(request.getProductId());
+        log.info("Fetched authoritative product data: name={}, price={}, sellerId={}", product.getName(), product.getPrice(), product.getUserId());
+
         Optional<CartItem> existing = cart.getItems().stream()
                 .filter(item -> item.getProductId().equals(request.getProductId()))
                 .findFirst();
 
         if (existing.isPresent()) {
             existing.get().setQuantity(existing.get().getQuantity() + request.getQuantity());
+            existing.get().setPrice(product.getPrice());
+            existing.get().setProductName(product.getName());
+            existing.get().setSellerId(product.getUserId());
             log.info("Incremented quantity for productId: {} in cart for userId: {}", request.getProductId(), userId);
         } else {
             CartItem newItem = new CartItem(
                     request.getProductId(),
-                    request.getProductName(),
-                    request.getPrice(),
+                    product.getName(),
+                    product.getPrice(),
                     request.getQuantity(),
                     request.getImageUrl(),
-                    request.getSellerId()
+                    product.getUserId()
             );
             cart.getItems().add(newItem);
             log.info("Added new item productId: {} to cart for userId: {}", request.getProductId(), userId);
@@ -103,12 +111,32 @@ public class CartService {
             throw new IllegalArgumentException("Cannot checkout with an empty cart");
         }
 
+        for (CartItem item : cart.getItems()) {
+            ProductDto product = productServiceClient.getProduct(item.getProductId());
+            if (product.getQuantity() < item.getQuantity()) {
+                log.warn("Checkout failed: insufficient stock for productId: {}. Available: {}, requested: {}",
+                        item.getProductId(), product.getQuantity(), item.getQuantity());
+                throw new IllegalArgumentException(
+                        "Insufficient stock for '" + item.getProductName() + "'. " +
+                        "Available: " + product.getQuantity() + ", requested: " + item.getQuantity());
+            }
+        }
+
         Map<String, List<CartItem>> itemsBySeller = cart.getItems().stream()
                 .collect(Collectors.groupingBy(CartItem::getSellerId));
 
         List<OrderResponse> orders = itemsBySeller.entrySet().stream()
                 .map(entry -> orderService.createOrder(userId, entry.getKey(), entry.getValue(), request))
                 .collect(Collectors.toList());
+
+        for (CartItem item : cart.getItems()) {
+            try {
+                productServiceClient.decrementStock(item.getProductId(), item.getQuantity());
+            } catch (Exception e) {
+                log.error("Failed to decrement stock for productId: {} after order creation: {}",
+                        item.getProductId(), e.getMessage());
+            }
+        }
 
         cart.setItems(new ArrayList<>());
         cartRepository.save(cart);
