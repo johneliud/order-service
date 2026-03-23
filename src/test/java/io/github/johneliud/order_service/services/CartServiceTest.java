@@ -1,5 +1,6 @@
 package io.github.johneliud.order_service.services;
 
+import io.github.johneliud.order_service.client.ProductServiceClient;
 import io.github.johneliud.order_service.dto.*;
 import io.github.johneliud.order_service.models.Cart;
 import io.github.johneliud.order_service.models.CartItem;
@@ -28,6 +29,9 @@ class CartServiceTest {
 
     @Mock
     private OrderService orderService;
+
+    @Mock
+    private ProductServiceClient productServiceClient;
 
     @InjectMocks
     private CartService cartService;
@@ -62,8 +66,10 @@ class CartServiceTest {
         Cart cart = emptyCart("user1");
         when(cartRepository.findByUserId("user1")).thenReturn(Optional.of(cart));
         when(cartRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(productServiceClient.getProduct("p1"))
+                .thenReturn(new ProductDto("p1", "Product p1", new BigDecimal("10.00"), 10, "seller1"));
 
-        CartItemRequest req = new CartItemRequest("p1", "Phone", new BigDecimal("100.00"), 2, null, "seller1");
+        CartItemRequest req = new CartItemRequest("p1", 2, null);
         CartResponse result = cartService.addItem("user1", req);
 
         assertThat(result.getItems()).hasSize(1);
@@ -76,8 +82,10 @@ class CartServiceTest {
         Cart cart = cartWith("user1", List.of(item("p1", "seller1", 2)));
         when(cartRepository.findByUserId("user1")).thenReturn(Optional.of(cart));
         when(cartRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(productServiceClient.getProduct("p1"))
+                .thenReturn(new ProductDto("p1", "Product p1", new BigDecimal("10.00"), 10, "seller1"));
 
-        CartItemRequest req = new CartItemRequest("p1", "Phone", new BigDecimal("100.00"), 1, null, "seller1");
+        CartItemRequest req = new CartItemRequest("p1", 1, null);
         CartResponse result = cartService.addItem("user1", req);
 
         assertThat(result.getItems()).hasSize(1);
@@ -153,14 +161,32 @@ class CartServiceTest {
         when(cartRepository.findByUserId("user1")).thenReturn(Optional.of(cart));
         when(orderService.createOrder(any(), any(), any(), any())).thenReturn(new OrderResponse());
         when(cartRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(productServiceClient.getProduct("p1"))
+                .thenReturn(new ProductDto("p1", "Product p1", new BigDecimal("10.00"), 10, "seller1"));
+        when(productServiceClient.getProduct("p2"))
+                .thenReturn(new ProductDto("p2", "Product p2", new BigDecimal("10.00"), 10, "seller1"));
 
         List<OrderResponse> orders = cartService.checkout("user1", checkoutRequest());
 
         assertThat(orders).hasSize(1);
         verify(orderService).createOrder(eq("user1"), eq("seller1"), any(), any());
+        verify(productServiceClient).decrementStock("p1", 1);
+        verify(productServiceClient).decrementStock("p2", 2);
         ArgumentCaptor<Cart> captor = ArgumentCaptor.forClass(Cart.class);
         verify(cartRepository, atLeastOnce()).save(captor.capture());
         assertThat(captor.getAllValues().stream().anyMatch(c -> c.getItems().isEmpty())).isTrue();
+    }
+
+    @Test
+    void checkout_insufficientStock_throws() {
+        Cart cart = cartWith("user1", List.of(item("p1", "seller1", 5)));
+        when(cartRepository.findByUserId("user1")).thenReturn(Optional.of(cart));
+        when(productServiceClient.getProduct("p1"))
+                .thenReturn(new ProductDto("p1", "Product p1", new BigDecimal("10.00"), 2, "seller1"));
+
+        assertThatThrownBy(() -> cartService.checkout("user1", checkoutRequest()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Insufficient stock");
     }
 
     @Test
