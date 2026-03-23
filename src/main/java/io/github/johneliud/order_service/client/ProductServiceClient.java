@@ -23,7 +23,7 @@ public class ProductServiceClient {
 
     private final RestClient restClient;
 
-    public ProductServiceClient(@Value("${product.service.url}") String productServiceUrl) {
+    public ProductServiceClient(@Value("${product.service.url:http://localhost:8082}") String productServiceUrl) {
         this.restClient = RestClient.builder()
                 .baseUrl(productServiceUrl)
                 .build();
