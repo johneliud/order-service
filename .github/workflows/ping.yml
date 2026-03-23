@@ -11,4 +11,4 @@ jobs:
     
     steps:
       - name: Ping order-service
-        run: curl -s -o /dev/null -w "%{http_code}" https://order-service-66hf.onrender.com/api/health || true
+        run: curl -s -o /dev/null -w "%{http_code}" https://order-service-66hf.onrender.com || true
