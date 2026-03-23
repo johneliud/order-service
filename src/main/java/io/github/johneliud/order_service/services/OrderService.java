@@ -240,9 +240,12 @@ public class OrderService {
         log.info("Order {} status updated to {} by sellerId: {}", orderId, targetStatus, sellerId);
 
         try {
+            List<OrderItemEvent> eventItems = saved.getItems().stream()
+                    .map(i -> new OrderItemEvent(i.getProductId(), i.getProductName(), i.getPrice(), i.getQuantity()))
+                    .collect(Collectors.toList());
             orderEventPublisher.publishOrderStatusChanged(new OrderStatusChangedEvent(
                     saved.getId(), saved.getUserId(), saved.getSellerId(),
-                    oldStatus.name(), targetStatus.name()
+                    oldStatus.name(), targetStatus.name(), eventItems
             ));
         } catch (Exception e) {
             log.error("Failed to publish order-status-changed event for orderId {}: {}", saved.getId(), e.getMessage());
