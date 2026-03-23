@@ -185,6 +185,32 @@ class OrderServiceTest {
     }
 
     @Test
+    void updateOrderStatus_sellerCancelsPendingOrder_succeeds() {
+        Order o = order("o1", "u1", "s1", OrderStatus.PENDING);
+        when(orderRepository.findById("o1")).thenReturn(Optional.of(o));
+        when(orderRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        doNothing().when(orderEventPublisher).publishOrderStatusChanged(any());
+
+        orderService.updateOrderStatus("o1", "s1", "CANCELLED");
+
+        assertThat(o.getStatus()).isEqualTo(OrderStatus.CANCELLED);
+        verify(orderEventPublisher).publishOrderStatusChanged(any());
+    }
+
+    @Test
+    void updateOrderStatus_sellerCancelsConfirmedOrder_succeeds() {
+        Order o = order("o1", "u1", "s1", OrderStatus.CONFIRMED);
+        when(orderRepository.findById("o1")).thenReturn(Optional.of(o));
+        when(orderRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        doNothing().when(orderEventPublisher).publishOrderStatusChanged(any());
+
+        orderService.updateOrderStatus("o1", "s1", "CANCELLED");
+
+        assertThat(o.getStatus()).isEqualTo(OrderStatus.CANCELLED);
+        verify(orderEventPublisher).publishOrderStatusChanged(any());
+    }
+
+    @Test
     void updateOrderStatus_invalidTransition_throws() {
         Order o = order("o1", "u1", "s1", OrderStatus.CONFIRMED);
         when(orderRepository.findById("o1")).thenReturn(Optional.of(o));
