@@ -12,8 +12,6 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.math.BigDecimal;
-
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @ExtendWith(MockitoExtension.class)
@@ -39,7 +37,7 @@ class CartControllerAuthTest {
 
     @Test
     void addItem_missingHeaders_throws401() {
-        CartItemRequest req = new CartItemRequest("p1", "Phone", new BigDecimal("10.00"), 1, null, "s1");
+        CartItemRequest req = new CartItemRequest("p1", 1, null);
         assertThatThrownBy(() -> cartController.addItem(req, null, null))
                 .isInstanceOf(UnauthorizedException.class);
     }
