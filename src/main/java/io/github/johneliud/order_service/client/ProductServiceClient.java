@@ -5,7 +5,10 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import io.github.johneliud.order_service.dto.ProductDto;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.retry.annotation.Backoff;
+import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 
 @Component
@@ -26,6 +29,7 @@ public class ProductServiceClient {
                 .build();
     }
 
+    @Retryable(retryFor = ResourceAccessException.class, maxAttempts = 3, backoff = @Backoff(delay = 1000, multiplier = 2))
     public ProductDto getProduct(String productId) {
         log.info("Fetching product data from product service for productId: {}", productId);
         try {
