@@ -18,6 +18,7 @@ import io.github.johneliud.order_service.exception.ForbiddenException;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -221,15 +222,15 @@ public class OrderService {
 
         OrderStatus targetStatus = parseStatus(statusStr);
 
-        Map<OrderStatus, OrderStatus> validTransitions = Map.of(
-                OrderStatus.PENDING, OrderStatus.CONFIRMED,
-                OrderStatus.CONFIRMED, OrderStatus.SHIPPED,
-                OrderStatus.SHIPPED, OrderStatus.DELIVERED
+        Map<OrderStatus, Set<OrderStatus>> validTransitions = Map.of(
+                OrderStatus.PENDING, Set.of(OrderStatus.CONFIRMED, OrderStatus.CANCELLED),
+                OrderStatus.CONFIRMED, Set.of(OrderStatus.SHIPPED, OrderStatus.CANCELLED),
+                OrderStatus.SHIPPED, Set.of(OrderStatus.DELIVERED)
         );
 
         OrderStatus oldStatus = order.getStatus();
-        OrderStatus expectedNext = validTransitions.get(oldStatus);
-        if (expectedNext == null || !expectedNext.equals(targetStatus)) {
+        Set<OrderStatus> allowedNext = validTransitions.get(oldStatus);
+        if (allowedNext == null || !allowedNext.contains(targetStatus)) {
             log.warn("Invalid status transition for order {}: {} → {}", orderId, oldStatus, targetStatus);
             throw new IllegalArgumentException("Invalid status transition: " + oldStatus + " → " + targetStatus);
         }
