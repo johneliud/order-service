@@ -6,7 +6,7 @@ import org.springframework.test.context.TestPropertySource;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.MOCK)
 @TestPropertySource(properties = {
-		"spring.data.mongodb.uri=mongodb://localhost:27017/test",
+		"spring.mongodb.uri=mongodb://localhost:27017/test",
 		"jwt.secret=testSecretKeyForTestingPurposeOnly123456",
 		"jwt.expiration=86400000",
 		"spring.kafka.bootstrap-servers=localhost:9092",
