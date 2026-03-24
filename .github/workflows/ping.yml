@@ -11,4 +11,4 @@ jobs:
     
     steps:
       - name: Ping order-service
-        run: curl -s -o /dev/null -w "%{http_code}" https://{{secrets.BASE_URL}}/api/health
+        run: curl -s -o /dev/null -w "%{http_code}" https://${{secrets.BASE_URL}}/api/health
